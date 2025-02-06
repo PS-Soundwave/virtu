@@ -54,50 +54,50 @@ struct AuthView: View {
     @State private var isSignUp = false
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text(isSignUp ? "Create Account" : "Sign In")
-                .font(.title)
-                .bold()
+            VStack(spacing: 20) {
+                Text(isSignUp ? "Create Account" : "Sign In")
+                    .font(.title)
+                    .bold()
 
-            TextField("Email", text: $viewModel.email)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .autocapitalization(.none)
-                .keyboardType(.emailAddress)
+                TextField("Email", text: $viewModel.email)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .autocapitalization(.none)
+                    .keyboardType(.emailAddress)
 
-            SecureField("Password", text: $viewModel.password)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
+                SecureField("Password", text: $viewModel.password)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
 
-            if !viewModel.errorMessage.isEmpty {
-                Text(viewModel.errorMessage)
-                    .foregroundColor(.red)
-                    .font(.caption)
-            }
-
-            Button(action: {
-                if isSignUp {
-                    viewModel.signUp()
-                } else {
-                    viewModel.signIn()
+                if !viewModel.errorMessage.isEmpty {
+                    Text(viewModel.errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
                 }
-            }) {
-                Text(isSignUp ? "Sign Up" : "Sign In")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-            }
 
-            Button(action: {
-                isSignUp.toggle()
-            }) {
-                Text(
-                    isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"
-                )
-                .foregroundColor(.blue)
+                Button(action: {
+                    if isSignUp {
+                        viewModel.signUp()
+                    } else {
+                        viewModel.signIn()
+                    }
+                }) {
+                    Text(isSignUp ? "Sign Up" : "Sign In")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+
+                Button(action: {
+                    isSignUp.toggle()
+                }) {
+                    Text(
+                        isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"
+                    )
+                    .foregroundColor(.blue)
+                }
             }
-        }
-        .padding()
+            .padding()
     }
 }
 
@@ -108,11 +108,15 @@ struct VirtuApp: App {
 
     var body: some Scene {
         WindowGroup {
+            Group {
             if viewModel.isAuthenticated {
                 ContentView()
             } else {
                 AuthView(viewModel: viewModel)
             }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.red)
         }
     }
 }

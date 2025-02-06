@@ -2,78 +2,80 @@ import AVKit
 import PhotosUI
 import SwiftUI
 
-struct ContentView: View {
-    // Create a video player with a sample video URL
-    private let player = AVPlayer(
-        url: Bundle.main.url(forResource: "placeholder", withExtension: "mp4") ?? URL(
-            string:
-                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-        )!)
-
-    @State private var isDrawerPresented = false
-    @State private var showingPhotoPicker = false
-    @State private var selectedItems: [PhotosPickerItem] = []
-    @State private var showingGallery = false
-
-    var body: some View {
-        GeometryReader { geometry in
-            VStack {
-                // Using AVPlayerViewController instead of VideoPlayer
-                AVPlayerControllerRepresentable(player: player)
-
-                HStack(alignment: .center, spacing: 20) {
-                    Button(action: {
-                        showingGallery = true
-                    }) {
-                        Image(systemName: "photo.stack")
-                            .font(.system(size: 30))
-                    }
-
-                    Menu {
-                        Button(action: {
-                            // Handle OBS recording option
-                            print("Record from OBS tapped")
-                        }) {
-                            Label("Record from OBS", systemImage: "record.circle")
-                        }
-
-                        Button(action: {
-                            showingPhotoPicker = true
-                        }) {
-                            Label("Upload Video", systemImage: "square.and.arrow.up")
-                        }
-                    } label: {
-                        Image(systemName: "video.badge.plus")
-                            .font(.system(size: 30))
-                    }
-                }
-            }
+// Model for video data from API
+struct Video: Codable, Identifiable {
+    let key: String
+    let createdAt: String
+    var id: String { key }
+    
+    var streamURL: URL {
+        guard let s3BaseURL = Bundle.main.object(forInfoDictionaryKey: "S3BaseURL") as? String else {
+            fatalError("S3BaseURL not found in Info.plist")
         }
-        .ignoresSafeArea(edges: [.top, .leading, .trailing])
-        .background(Color.black)
-        .foregroundColor(Color.white)
-        .onAppear {
-            player.play()
+        return URL(string: "\(s3BaseURL)/\(key)")!
+    }
+}
+
+// View model to fetch and manage videos
+class VideoFeedViewModel: ObservableObject {
+    @Published var videos: [Video] = []
+    var baseURL: String
+
+    init() {
+        guard
+            let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String
+        else {
+            fatalError("APIBaseURL not configured in Info.plist")
         }
-        .photosPicker(
-            isPresented: $showingPhotoPicker,
-            selection: $selectedItems,
-            maxSelectionCount: 1,
-            matching: .videos,
-            preferredItemEncoding: .current
-        )
-        .onChange(of: selectedItems) { prev, items in
-            guard let item = items.first else { return }
-            // Handle the selected video here
-            print("Video selected")
-        }
-        .fullScreenCover(isPresented: $showingGallery) {
-            GalleryView()
+        
+        self.baseURL = baseURL
+    }
+    
+    func fetchVideos() async {
+        do {
+            let url = URL(string: "\(baseURL)/videos")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(VideoResponse.self, from: data)
+            self.videos = response.videos
+        } catch {
+            print("Error fetching videos: \(error)")
         }
     }
 }
 
-// Wrapper to use AVPlayerViewController in SwiftUI
+// Response type for the API
+struct VideoResponse: Codable {
+    let videos: [Video]
+}
+
+// Custom video player view that handles HLS streams
+struct VideoPlayerView: View {
+    let video: Video
+    @State private var player: AVPlayer?
+    
+    var body: some View {
+        Group {
+            if let player {
+                AVPlayerControllerRepresentable(player: player)
+                    .onAppear {
+                        player.play()
+                    }
+                    .onDisappear {
+                        player.pause()
+                    }
+            }
+        }
+        .onAppear {
+            let player = AVPlayer(url: video.streamURL)
+            
+            player.automaticallyWaitsToMinimizeStalling = false
+            
+            self.player = player
+        }
+    }
+}
+
+// Custom AVPlayerController for better control
 struct AVPlayerControllerRepresentable: UIViewControllerRepresentable {
     let player: AVPlayer
 
@@ -94,6 +96,123 @@ struct AVPlayerControllerRepresentable: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
 }
 
+// Main content view with vertical scroll
+struct ContentView: View {
+    @StateObject private var viewModel = VideoFeedViewModel()
+    @State private var currentIndex = 0
+    @State private var showingGallery = false
+    @State private var showingPhotoPicker = false
+    @State private var selectedItems: [PhotosPickerItem] = []
+    @State private var isUploading = false
+    @State private var uploadError: Error?
+    
+    var body: some View {
+            VStack {
+                ZStack {
+                    if isUploading {
+                        ProgressView("Uploading...")
+                    }
+                    TabView(selection: $currentIndex) {
+                        ForEach(Array(viewModel.videos.enumerated()), id: \.element.id) { index, video in
+                            VideoPlayerView(video: video)
+                                .rotationEffect(.degrees(-90))
+                                .frame(width: UIScreen.main.bounds.height, height: UIScreen.main.bounds.width)
+                                .tag(index)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                }
+                
+                HStack(alignment: .center, spacing: 20) {
+                    Button(action: {
+                        showingGallery = true
+                    }) {
+                        Image(systemName: "photo.stack")
+                            .font(.system(size: 30))
+                    }
+
+                    Menu {
+                        Button(action: {
+                            // Handle OBS recording option
+                            print("Record from OBS tapped")
+                        }) {
+                            Label("Record from OBS", systemImage: "record.circle")
+                        }
+                        
+                        Button(action: {
+                            showingPhotoPicker = true
+                        }) {
+                            Label("Upload Video", systemImage: "square.and.arrow.up")
+                        }
+                    } label: {
+                        Image(systemName: "video.badge.plus")
+                            .font(.system(size: 30))
+                    }
+                }
+            }
+            .ignoresSafeArea(edges: [.top, .leading, .trailing])
+            .task {
+                await viewModel.fetchVideos()
+            }
+            .photosPicker(
+                isPresented: $showingPhotoPicker,
+                selection: $selectedItems,
+                maxSelectionCount: 1,
+                matching: .videos,
+                preferredItemEncoding: .current
+            )
+            .onChange(of: selectedItems) { prev, items in
+                guard let item = items.first else { return }
+                item.loadTransferable(
+                    type: VideoPickerTransferable.self
+                ) { result in
+                    guard let videoData = try? result.get() else { return }
+                    Task {
+                        await uploadVideo(url: videoData.url)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private func uploadVideo(url: URL) async {
+        isUploading = true
+        defer { isUploading = false }
+
+        do {
+            // Now upload the local copy
+            try await UploadService.shared.uploadVideo(fileURL: url)
+            print("Upload completed")
+
+            // Clean up the temporary file
+            try? FileManager.default.removeItem(at: url)
+        } catch {
+            print(error)
+            self.uploadError = error
+        }
+    }
+}
+
+// Add this to handle video data from PhotosPicker
+struct VideoPickerTransferable: Transferable {
+    let url: URL
+    
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .movie) { received in
+            SentTransferredFile(received.url)
+        } importing: { received in
+            let dest = FileManager.default.temporaryDirectory.appendingPathComponent(
+                received.file.lastPathComponent)
+            
+            try? FileManager.default.removeItem(at: dest)
+
+            try FileManager.default.copyItem(at: received.file, to: dest)
+            
+            return Self(url: dest)
+        }
+    }
+}
+
 struct GalleryView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -110,9 +229,9 @@ struct GalleryView: View {
         VideoItem(thumbnailName: "video.fill", title: "Video 3"),
         // Add more sample items as needed
     ]
-
+    
     var body: some View {
-        ScrollView {
+            ScrollView {
             VStack(spacing: 20) {
                 // Profile Header
                 HStack(spacing: 15) {
