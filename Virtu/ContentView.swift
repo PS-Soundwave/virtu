@@ -5,13 +5,14 @@ import SwiftUI
 // Model for video data from API
 struct Video: Codable, Identifiable {
     let key: String
-    let createdAt: String
-    var id: String { key }
+    let created_at: String
+    let id: String
     
     var streamURL: URL {
         guard let s3BaseURL = Bundle.main.object(forInfoDictionaryKey: "S3BaseURL") as? String else {
             fatalError("S3BaseURL not found in Info.plist")
         }
+
         return URL(string: "\(s3BaseURL)/\(key)")!
     }
 }
@@ -19,7 +20,7 @@ struct Video: Codable, Identifiable {
 // View model to fetch and manage videos
 class VideoFeedViewModel: ObservableObject {
     @Published var videos: [Video] = []
-    var baseURL: String
+    let baseURL: String
 
     init() {
         guard
@@ -36,7 +37,10 @@ class VideoFeedViewModel: ObservableObject {
             let url = URL(string: "\(baseURL)/videos")!
             let (data, _) = try await URLSession.shared.data(from: url)
             let response = try JSONDecoder().decode(VideoResponse.self, from: data)
-            self.videos = response.videos
+            
+            await MainActor.run {
+                self.videos = response.videos
+            }
         } catch {
             print("Error fetching videos: \(error)")
         }
@@ -51,26 +55,70 @@ struct VideoResponse: Codable {
 // Custom video player view that handles HLS streams
 struct VideoPlayerView: View {
     let video: Video
-    @State private var player: AVPlayer?
-    
     var body: some View {
-        Group {
-            if let player {
-                AVPlayerControllerRepresentable(player: player)
+        let player = AVPlayer(url: video.streamURL)
+        AVPlayerControllerRepresentable(player: player)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onAppear {
                         player.play()
                     }
                     .onDisappear {
                         player.pause()
                     }
-            }
-        }
-        .onAppear {
-            let player = AVPlayer(url: video.streamURL)
+        .task {
+            /*print("Starting to create player for URL: \(video.streamURL)")
             
-            player.automaticallyWaitsToMinimizeStalling = false
-            
-            self.player = player
+            // Create an asset and observe its loading status
+            let asset = AVURLAsset(url: video.streamURL)
+            do {
+                try await asset.load(.tracks)
+                try await asset.load(.duration)
+                let isPlayable = try await asset.load(.isPlayable)
+                print("Asset isPlayable: \(isPlayable) for \(video.streamURL)")
+                
+                // Only create the player if the asset is playable
+                if isPlayable {
+                    let playerItem = AVPlayerItem(asset: asset)
+                    
+                    // Wait for the player item to become ready
+                    try await withCheckedThrowingContinuation { continuation in
+                        var observation: NSKeyValueObservation?
+                        observation = playerItem.observe(\.status, options: [.new, .initial]) { item, _ in
+                            print("Player item status changed to: \(item.status.rawValue)")
+                            switch item.status {
+                            case .readyToPlay:
+                                continuation.resume()
+                                observation?.invalidate()
+                            case .failed:
+                                continuation.resume(throwing: item.error ?? NSError(domain: "", code: -1))
+                                observation?.invalidate()
+                            default:
+                                break
+                            }
+                        }
+                    }
+                    
+                    let player = AVPlayer(playerItem: playerItem)
+                    player.actionAtItemEnd = .none
+                    
+                    // Add observers for player status
+                    let _ = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { time in
+                        print("Player time update for \(video.streamURL): \(time.seconds)")
+                    }
+                    
+                    player.automaticallyWaitsToMinimizeStalling = false
+                    self.player = player
+                    print("Player setup complete for \(video.streamURL)")
+                    
+                    // Start playback immediately
+                    player.play()
+                } else {
+                    print("Asset is not playable for \(video.streamURL)")
+                }
+            } catch {
+                print("Failed to load asset: \(error) for \(video.streamURL)")
+                playerError = error
+            }*/
         }
     }
 }
@@ -84,11 +132,6 @@ struct AVPlayerControllerRepresentable: UIViewControllerRepresentable {
         controller.player = player
         controller.showsPlaybackControls = false
         controller.videoGravity = .resize
-
-        // Rotate the video layer 90 degrees
-        if let layer = controller.view?.layer {
-            layer.transform = CATransform3DMakeRotation(.pi / 2, 0, 0, 1)
-        }
 
         return controller
     }
@@ -112,15 +155,16 @@ struct ContentView: View {
                     if isUploading {
                         ProgressView("Uploading...")
                     }
-                    TabView(selection: $currentIndex) {
-                        ForEach(Array(viewModel.videos.enumerated()), id: \.element.id) { index, video in
-                            VideoPlayerView(video: video)
-                                .rotationEffect(.degrees(-90))
-                                .frame(width: UIScreen.main.bounds.height, height: UIScreen.main.bounds.width)
-                                .tag(index)
-                        }
+                    GeometryReader { geometry in 
+                        ScrollView(.vertical) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(viewModel.videos) { video in
+                                    VideoPlayerView(video: video).frame(width: geometry.size.width, height: geometry.size.height)
+                                }
+                        }.scrollTargetLayout()
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .scrollTargetBehavior(.paging)
+                    }
                 }
                 
                 HStack(alignment: .center, spacing: 20) {
@@ -180,12 +224,13 @@ struct ContentView: View {
         defer { isUploading = false }
 
         do {
+            defer {
+                try? FileManager.default.removeItem(at: url)
+            }
+
             // Now upload the local copy
             try await UploadService.shared.uploadVideo(fileURL: url)
             print("Upload completed")
-
-            // Clean up the temporary file
-            try? FileManager.default.removeItem(at: url)
         } catch {
             print(error)
             self.uploadError = error

@@ -14,6 +14,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
 class VirtuViewModel: ObservableObject {
     @Published var isAuthenticated = false
+    @Published var hasUsername = false
     @Published var email = ""
     @Published var password = ""
     @Published var errorMessage = ""
@@ -24,7 +25,20 @@ class VirtuViewModel: ObservableObject {
                 self.errorMessage = error.localizedDescription
                 return
             }
-            self.isAuthenticated = true
+
+            Task {
+                if let _ = try? await UserService.shared.getCurrentUser() {
+                    await MainActor.run {
+                        self.hasUsername = true
+                        self.isAuthenticated = true
+                    }
+                }
+                else {
+                    await MainActor.run {
+                        self.isAuthenticated = true
+                    }
+                }
+            }
         }
     }
 
@@ -34,7 +48,7 @@ class VirtuViewModel: ObservableObject {
                 self.errorMessage = error.localizedDescription
                 return
             }
-            print("User created: \(result?.user.uid ?? "Unknown")")
+
             self.isAuthenticated = true
         }
     }
@@ -52,6 +66,7 @@ class VirtuViewModel: ObservableObject {
 struct AuthView: View {
     @StateObject var viewModel: VirtuViewModel
     @State private var isSignUp = false
+    @State private var isLoading = false
 
     var body: some View {
             VStack(spacing: 20) {
@@ -63,9 +78,11 @@ struct AuthView: View {
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .autocapitalization(.none)
                     .keyboardType(.emailAddress)
+                    .disabled(isLoading)
 
                 SecureField("Password", text: $viewModel.password)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .disabled(isLoading)
 
                 if !viewModel.errorMessage.isEmpty {
                     Text(viewModel.errorMessage)
@@ -74,6 +91,7 @@ struct AuthView: View {
                 }
 
                 Button(action: {
+                    isLoading = true
                     if isSignUp {
                         viewModel.signUp()
                     } else {
@@ -87,6 +105,7 @@ struct AuthView: View {
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }
+                .disabled(isLoading)
 
                 Button(action: {
                     isSignUp.toggle()
@@ -96,8 +115,17 @@ struct AuthView: View {
                     )
                     .foregroundColor(.blue)
                 }
+                .disabled(isLoading)
             }
             .padding()
+            .overlay {
+                if isLoading {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .onChange(of: viewModel.isAuthenticated) { _, newValue in
+                isLoading = false
+            }
     }
 }
 
@@ -109,11 +137,15 @@ struct VirtuApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-            if viewModel.isAuthenticated {
-                ContentView()
-            } else {
-                AuthView(viewModel: viewModel)
-            }
+                if viewModel.isAuthenticated {
+                    if viewModel.hasUsername {
+                        ContentView()
+                    } else {
+                        UsernameView(hasUsername: $viewModel.hasUsername)
+                    }
+                } else {
+                    AuthView(viewModel: viewModel)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.red)
