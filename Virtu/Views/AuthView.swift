@@ -91,7 +91,12 @@ struct AuthView: View {
         .padding()
         .overlay {
             if isLoading {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                if isSignUp {
+                    ProgressView("Signing Up...")
+                }
+                else {
+                    ProgressView("Logging In...")
+                }
             }
         }
         .onChange(of: isLoading) { wasLoading, isLoading in

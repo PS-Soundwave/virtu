@@ -1,22 +1,19 @@
 import Foundation
 import FirebaseAuth
 
-class UserService: ObservableObject {
+// TODO: Review
+
+struct UserService {
     static let shared = UserService()
     
-    private var baseURL: String {
-        guard let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String else {
-            fatalError("APIBaseURL not found in Info.plist")
-        }
-        return baseURL
-    }
-    
+    private init() {}
+
     func getCurrentUser() async throws -> String? {
         guard let token = try await Auth.auth().currentUser?.getIDToken() else {
             throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No authenticated user"])
         }
         
-        guard let url = URL(string: "\(baseURL)/user/me") else {
+        guard let url = URL(string: "\(PropertiesService.shared.baseURL)/user/me") else {
             throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
         }
         
@@ -50,7 +47,7 @@ class UserService: ObservableObject {
             throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No authenticated user"])
         }
         
-        guard let url = URL(string: "\(baseURL)/user/me") else {
+        guard let url = URL(string: "\(PropertiesService.shared.baseURL)/user/me") else {
             throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
         }
         

@@ -7,24 +7,15 @@ enum UploadError: Error {
     case missingConfiguration
 }
 
-actor UploadService {
-    static let shared = UploadService()
-    private let baseURL: String
+// TODO: Review
 
-    private init() {
-        // Load from Info.plist
-        guard
-            let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL")
-                as? String
-        else {
-            fatalError("UploadServiceBaseURL not configured in Info.plist")
-        }
-        
-        self.baseURL = baseURL
-    }
+struct UploadService {
+    static let shared = UploadService()
+
+    private init() {}
 
     func uploadVideo(fileURL: URL) async throws {
-        guard let url = URL(string: "\(baseURL)/upload") else {
+        guard let url = URL(string: "\(PropertiesService.shared.baseURL)/upload") else {
             throw UploadError.invalidURL
         }
 

@@ -2,7 +2,7 @@ import SwiftUI
 
 // TODO: Review
 struct GalleryView: View {
-    @Environment(\.dismiss) private var dismiss
+    let username: Binding<String>
 
     struct VideoItem: Identifiable {
         let id = UUID()
@@ -30,7 +30,7 @@ struct GalleryView: View {
                         .clipShape(Circle())
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Username")
+                        Text(username.wrappedValue)
                             .font(.title2)
                             .bold()
                         Text("Bio description goes here")

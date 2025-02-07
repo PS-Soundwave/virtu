@@ -11,11 +11,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-class VirtuViewModel: ObservableObject {
-    @Published var isAuthenticated = false
-    @Published var hasUsername = false
-}
-
 @main
 struct VirtuApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
