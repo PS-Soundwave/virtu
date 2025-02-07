@@ -1,8 +1,9 @@
 import SwiftUI
 
 struct UsernameView: View {
-    @StateObject private var viewModel = UsernameViewModel()
-    @Binding var hasUsername: Bool
+    @ObservedObject var viewModel: VirtuViewModel
+    @State private var username = ""
+    @State private var errorMessage = ""
     
     var body: some View {
         VStack(spacing: 20) {
@@ -10,22 +11,33 @@ struct UsernameView: View {
                 .font(.title)
                 .bold()
             
-            TextField("Username", text: $viewModel.username)
+            TextField("Username", text: $username)
                 .textFieldStyle(.roundedBorder)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
             
-            if !viewModel.errorMessage.isEmpty {
-                Text(viewModel.errorMessage)
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
                     .foregroundColor(.red)
                     .font(.caption)
             }
             
             Button(action: {
+                errorMessage = ""
+
                 Task {
-                    await viewModel.setUsername()
-                    if viewModel.errorMessage.isEmpty {
-                        hasUsername = true
+                    do {
+                        try await UserService.shared.setUsername(username)
+                    } catch {
+                        await MainActor.run {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                    
+                    if errorMessage.isEmpty {
+                        await MainActor.run {
+                            viewModel.hasUsername = true
+                        }
                     }
                 }
             }) {
@@ -36,23 +48,8 @@ struct UsernameView: View {
                     .background(Color.blue)
                     .cornerRadius(10)
             }
-            .disabled(viewModel.username.isEmpty)
+            .disabled(username.isEmpty)
         }
         .padding()
-    }
-}
-
-class UsernameViewModel: ObservableObject {
-    @Published var username = ""
-    @Published var errorMessage = ""
-    
-    func setUsername() async {
-        do {
-            try await UserService.shared.setUsername(username)
-        } catch {
-            await MainActor.run {
-                self.errorMessage = error.localizedDescription
-            }
-        }
     }
 }

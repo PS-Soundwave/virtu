@@ -20,7 +20,7 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 "UILaunchScreen": ["UIColorName": "Background"],
                 "FirebaseAppDelegateProxyEnabled": false,
-                "APIBaseURL": "http://169.254.153.53:3000",
+                "APIBaseURL": "http://169.254.171.208:3000",
                 "S3BaseURL": "https://cm-virtu-convert-out.s3.us-east-1.amazonaws.com"
             ]),
             sources: ["Virtu/**"],
