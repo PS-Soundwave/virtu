@@ -8,7 +8,7 @@ struct ContentView: View {
     @State private var isUploading = false
     @State private var uploadError: Error?
     @State private var showingSearchSheet = false
-    @State private var galleryUsername = ""
+    @State private var galleryUser: User? = nil
     @State private var videos = [Video]()
     @State private var baseURL: String
 
@@ -38,7 +38,7 @@ struct ContentView: View {
             
             HStack(alignment: .center, spacing: 30) {
                 Button(action: {
-                    galleryUsername = ""
+                    galleryUser = nil
                     showingGallery = true
                 }) {
                     Image(systemName: "photo.stack")
@@ -94,15 +94,15 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showingSearchSheet) {
-            SearchSheet(onUserSelected: { username in 
-                galleryUsername = username
+            SearchSheet(onUserSelected: { user in 
+                galleryUser = user
                 showingSearchSheet = false
                 showingGallery = true
             })
             .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingGallery) {
-            GalleryView(username: $galleryUsername)
+            GalleryView(user: $galleryUser)
         }
         .ignoresSafeArea(edges: [.top, .leading, .trailing])
         .ignoresSafeArea(.keyboard)
@@ -125,7 +125,7 @@ struct ContentView: View {
             }
 
             // Now upload the local copy
-            try await UploadService.shared.uploadVideo(fileURL: url)
+            try await VideoService.shared.postVideo(fileURL: url)
             print("Upload completed")
         } catch {
             print(error)

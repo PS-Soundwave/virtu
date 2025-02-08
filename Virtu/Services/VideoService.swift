@@ -1,23 +1,32 @@
-import FirebaseAuth
-import Foundation
+import SwiftUI
 import UniformTypeIdentifiers
+import FirebaseAuth
 
-enum UploadError: Error {
-    case error(Int)
-    case unauthorized
-}
-
-struct UploadService {
-    static let shared = UploadService()
+struct VideoService {
+    static let shared = VideoService()
 
     private init() {}
 
-    func uploadVideo(fileURL: URL) async throws {
+    func getVideos() async throws -> [Video] {
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/video")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+
+        let videos = try JSONDecoder().decode([Video].self, from: data)
+        return videos
+    }
+
+    func postVideo(fileURL: URL) async throws {
         guard let token = try await Auth.auth().currentUser?.getIDToken() else {
-            throw UploadError.unauthorized
+            throw HttpError.unauthorized
         }
         
-        let url = URL(string: "\(PropertiesService.shared.baseURL)/upload")!
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/video")!
 
         let boundary = UUID().uuidString
         var request = URLRequest(url: url)
@@ -44,10 +53,10 @@ struct UploadService {
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
-        let httpResponse = response as! HTTPURLResponse
-
-        guard httpResponse.statusCode == 200 else {
-            throw UploadError.error(httpResponse.statusCode)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
         }
+
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
     }
 }

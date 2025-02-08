@@ -1,21 +1,17 @@
 import Foundation
 import FirebaseAuth
 
-// TODO: Review
-
 struct UserService {
     static let shared = UserService()
     
     private init() {}
 
-    func getCurrentUser() async throws -> String? {
+    func getCurrentUser() async throws -> User? {
         guard let token = try await Auth.auth().currentUser?.getIDToken() else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No authenticated user"])
+            throw HttpError.unauthorized
         }
         
-        guard let url = URL(string: "\(PropertiesService.shared.baseURL)/user/me") else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
-        }
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user/me")!
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -23,50 +19,95 @@ struct UserService {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+            throw HttpError.serverError
         }
-        
-        if httpResponse.statusCode == 404 {
+
+        guard httpResponse.statusCode != 404 else {
             return nil
         }
 
-        guard httpResponse.statusCode != 401 else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unauthorized"])
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw NSError(domain: "UserService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error"])
-        }
-        
-        let userResponse = try JSONDecoder().decode(UserResponse.self, from: data)
-        return userResponse.username
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+
+        let user = try JSONDecoder().decode(User.self, from: data)
+
+        return user
     }
     
-    func setUsername(_ username: String) async throws {
+    func patchUsername(_ username: String) async throws {
         guard let token = try await Auth.auth().currentUser?.getIDToken() else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No authenticated user"])
+            throw HttpError.unauthorized
         }
         
-        guard let url = URL(string: "\(PropertiesService.shared.baseURL)/user/me") else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
-        }
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user/me")!
         
         var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        request.httpMethod = "PATCH"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let body = UserResponse(username: username)
+        let body = PutUserMeRequest(username: username)
         request.httpBody = try JSONEncoder().encode(body)
         
         let (_, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to set username"])
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
         }
+        
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+    }
+
+    func searchUsers(_ query: String) async throws -> [User] {
+        guard !query.isEmpty else { return [] }
+
+        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
+        
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user/search?q=\(encodedQuery)")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+
+        let users = try JSONDecoder().decode([User].self, from: data)
+        return users
+    }
+    
+    func getUserForUsername(_ username: String) async throws -> User? {
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user?username=\(username)")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+
+        guard httpResponse.statusCode != 404 else {
+            return nil
+        }
+
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+
+        let user = try JSONDecoder().decode(User.self, from: data)
+        return user
+    }
+
+    func getVideos(userId: String) async throws -> [Video] {
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user/\(userId)/video")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+
+        let videos = try JSONDecoder().decode([Video].self, from: data)
+        return videos
     }
 }
 
-struct UserResponse: Codable {
+struct PutUserMeRequest: Codable {
     let username: String
 }

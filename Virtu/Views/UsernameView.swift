@@ -27,7 +27,7 @@ struct UsernameView: View {
 
                 Task {
                     do {
-                        try await UserService.shared.setUsername(username)
+                        try await UserService.shared.patchUsername(username)
                     } catch {
                         await MainActor.run {
                             errorMessage = error.localizedDescription

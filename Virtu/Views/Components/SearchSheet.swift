@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct SearchSheet: View {
-    let onUserSelected: (String) -> Void
+    let onUserSelected: (User) -> Void
     @State private var searchText = ""
     @State private var showingSuggestions = false
-    @State private var userSuggestions: [String] = []
+    @State private var userSuggestions = [User]()
 
-    init(onUserSelected: @escaping (String) -> Void = { _ in }) {
+    init(onUserSelected: @escaping (User) -> Void = { _ in }) {
         self.onUserSelected = onUserSelected
     }
 
@@ -21,7 +21,7 @@ struct SearchSheet: View {
                         Task {
                             if !newValue.isEmpty {
                                 do {
-                                    userSuggestions = try await UserSearchService.shared.searchUsers(query: newValue)
+                                    userSuggestions = try await UserService.shared.searchUsers(newValue)
                                     showingSuggestions = !userSuggestions.isEmpty
                                 } catch {
                                     print("Error searching users: \(error)")
@@ -37,20 +37,19 @@ struct SearchSheet: View {
             Spacer()
             
             if showingSuggestions {
-                List(userSuggestions, id: \.self) { suggestion in
+                List(userSuggestions) { suggestion in
                     Button(action: {
                         Task {
                             do {
-                                if try await UserSearchService.shared.validateUsername(suggestion) {
-                                    searchText = suggestion
-                                    onUserSelected(suggestion)
-                                }
+                                let user = try await UserService.shared.getUserForUsername(suggestion.username)!
+                                searchText = suggestion.username
+                                onUserSelected(user)
                             } catch {
                                 print("Error validating username: \(error)")
                             }
                         }
                     }) {
-                        Text(suggestion)
+                        Text(suggestion.username)
                     }
                 }
             }
