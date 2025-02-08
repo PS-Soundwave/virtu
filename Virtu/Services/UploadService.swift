@@ -1,5 +1,6 @@
 import FirebaseAuth
 import Foundation
+import UniformTypeIdentifiers
 
 enum UploadError: Error {
     case error(Int)
@@ -28,13 +29,14 @@ struct UploadService {
         // Create multipart form data
         var data = Data()
         let fileData = try Data(contentsOf: fileURL)
+        let type = UTType(filenameExtension: fileURL.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
 
         // Add file boundary
         data.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
         data.append(
-            "Content-Disposition: form-data; name=\"file\"\r\n".data(
+            "Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n".data(
                 using: .utf8)!)
-        data.append("Content-Type: video/mp4\r\n\r\n".data(using: .utf8)!)
+        data.append("Content-Type: \(type)\r\n\r\n".data(using: .utf8)!)
         data.append(fileData)
         data.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
 
