@@ -19,7 +19,7 @@ struct GalleryView: View {
     ]
     
     var body: some View {
-            ScrollView {
+        ScrollView {
             VStack(spacing: 20) {
                 // Profile Header
                 HStack(spacing: 15) {
@@ -55,7 +55,7 @@ struct GalleryView: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
+        .padding()
     }
 }
 

@@ -21,7 +21,8 @@ let project = Project(
                 "UILaunchScreen": ["UIColorName": "Background"],
                 "FirebaseAppDelegateProxyEnabled": false,
                 "APIBaseURL": "http://169.254.128.95:3000",
-                "S3BaseURL": "https://cm-virtu-convert-out.s3.us-east-1.amazonaws.com"
+                "S3BaseURL": "https://cm-virtu-convert-out.s3.us-east-1.amazonaws.com",
+                "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"]
             ]),
             sources: ["Virtu/**"],
             resources: .resources([
