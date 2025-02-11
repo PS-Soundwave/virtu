@@ -8,11 +8,14 @@ struct VideoPlayerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var isVisible = false
     @State private var player: AVPlayer?
+    @State private var isPlaying = false
     
     var body: some View {
         ZStack {
+            // Video player
             if let player = player {
-                AVPlayerControllerRepresentable(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
+                AVPlayerControllerRepresentable(player: player)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onScrollVisibilityChange(threshold: 1) { visible in
                         isVisible = visible
 
@@ -32,15 +35,47 @@ struct VideoPlayerView: View {
                         }
                     }
             }
+
+            if !isPlaying {
+                AsyncImage(url: video.thumbnailURL) { image in
+                    image
+                        .resizable()
+                } placeholder: {
+                    Color.gray
+                }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .onAppear {
-            if (player == nil) {
+            if player == nil {
                 let player = AVPlayer(url: video.streamURL)
-
                 self.player = player
+                
+                player.playImmediately(atRate: 1)
+                
+                Task {
+                    await withTaskGroup(of: Void.self) { group in
+                        // Monitor playback status
+                        group.addTask {
+                            for await status in player.publisher(for: \.timeControlStatus).values {
+                                await MainActor.run {
+                                    isPlaying = isPlaying || status == .playing && player.currentItem?.isPlaybackLikelyToKeepUp == true
+                                }
+                            }
+                        }
+                        
+                        // Monitor buffer state
+                        group.addTask {
+                            guard let item = player.currentItem else { return }
+                            for await keepUp in item.publisher(for: \.isPlaybackLikelyToKeepUp).values {
+                                await MainActor.run {
+                                    isPlaying = isPlaying || keepUp && player.timeControlStatus == .playing
+                                }
+                            }
+                        }
+                    }
+                }
             }
-
-            player?.seek(to: .zero)
         }
     }
 }

@@ -20,8 +20,8 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 "UILaunchScreen": ["UIColorName": "Background"],
                 "FirebaseAppDelegateProxyEnabled": false,
-                "APIBaseURL": "http://169.254.223.208:3000",
-                "S3BaseURL": "https://cm-virtu-convert-out.s3.us-east-1.amazonaws.com",
+                "APIBaseURL": "http://169.254.98.155:3000",
+                "S3BaseURL": "https://d2atizltqcfmsa.cloudfront.net",
                 "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"]
             ]),
             sources: ["Virtu/**"],
