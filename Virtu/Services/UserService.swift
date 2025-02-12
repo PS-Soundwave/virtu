@@ -106,8 +106,72 @@ struct UserService {
         let videos = try JSONDecoder().decode([Video].self, from: data)
         return videos
     }
+    
+    func getFollowInfo(userId: String) async throws -> FollowInfo {
+        guard let token = try await Auth.auth().currentUser?.getIDToken() else {
+            throw HttpError.unauthorized
+        }
+        
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user/\(userId)/follows")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+        
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+        
+        return try JSONDecoder().decode(FollowInfo.self, from: data)
+    }
+    
+    func followUser(userId: String) async throws {
+        guard let token = try await Auth.auth().currentUser?.getIDToken() else {
+            throw HttpError.unauthorized
+        }
+        
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user/\(userId)/follows")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+        
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+    }
+    
+    func unfollowUser(userId: String) async throws {
+        guard let token = try await Auth.auth().currentUser?.getIDToken() else {
+            throw HttpError.unauthorized
+        }
+        
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user/\(userId)/follows")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+        
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+    }
 }
 
 struct PutUserMeRequest: Codable {
     let username: String
+}
+
+struct FollowInfo: Codable {
+    let followers: Int
+    let following: Int
+    let isFollowing: Bool
 }

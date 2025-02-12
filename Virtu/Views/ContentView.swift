@@ -9,6 +9,8 @@ struct ContentView: View {
     @State private var showingSearchSheet = false
     @State private var videos = [Video]()
     @State private var baseURL: String
+    @State private var selectedUser: User?
+    @State private var showingGallery = false
 
     init() {
         guard
@@ -85,9 +87,14 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingSearchSheet) {
             SearchSheet(onUserSelected: { user in 
+                selectedUser = user
                 showingSearchSheet = false
+                showingGallery = true
             })
             .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showingGallery) {
+            GalleryView(user: $selectedUser)
         }
         .ignoresSafeArea(edges: [.top, .leading, .trailing])
         .ignoresSafeArea(.keyboard)

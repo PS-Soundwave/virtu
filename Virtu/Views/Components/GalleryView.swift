@@ -7,29 +7,74 @@ struct GalleryView: View {
     @State private var isLoading = false
     @State private var error: Error?
     @State private var selectedVideo: Video?
-
+    @State private var followInfo: FollowInfo?
+    @State private var isLoadingFollow = false
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Profile Header
-                HStack(spacing: 15) {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
+                VStack(spacing: 20) {
+                    HStack(spacing: 20) {
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 80, height: 80)
+                            .clipShape(Circle())
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(user.wrappedValue?.username ?? "")
-                            .font(.title2)
-                            .bold()
-                        Text("Bio description goes here")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(user.wrappedValue?.username ?? "")
+                                .font(.title2)
+                                .bold()
+                                .lineLimit(1)
+                            
+                            Button(action: {
+                                Task {
+                                    await toggleFollow()
+                                }
+                            }) {
+                                Text(followInfo?.isFollowing ?? false ? "Unfollow" : "Follow")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .frame(width: 120)
+                                    .padding(.vertical, 8)
+                                    .background(followInfo?.isFollowing ?? false ? Color.gray : Color.blue)
+                                    .cornerRadius(20)
+                            }
+                            .disabled(isLoadingFollow)
+                            .opacity(isLoadingFollow ? 0.5 : 1)
+                        }
+                        
+                        Spacer()
                     }
-                    Spacer()
+                    
+                    HStack {
+                        Spacer()
+                        
+                        VStack(spacing: 4) {
+                            Text("\(followInfo?.followers ?? 0)")
+                                .font(.headline)
+                            Text("Followers")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(spacing: 4) {
+                            Text("\(followInfo?.following ?? 0)")
+                                .font(.headline)
+                            Text("Following")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    Divider()
                 }
-                .padding(.horizontal)
 
                 if isLoading {
                     ProgressView()
@@ -63,6 +108,7 @@ struct GalleryView: View {
         .padding()
         .task {
             await loadVideos()
+            await loadFollowInfo()
         }
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, isFullScreen: true)
@@ -82,6 +128,39 @@ struct GalleryView: View {
         }
         
         isLoading = false
+    }
+    
+    private func loadFollowInfo() async {
+        guard let userId = user.wrappedValue?.id else { return }
+        
+        do {
+            let newFollowInfo = try await UserService.shared.getFollowInfo(userId: userId)
+            
+            await MainActor.run {
+                followInfo = newFollowInfo
+            }
+        } catch {
+            print("Failed to load follow info: \(error)")
+        }
+    }
+    
+    private func toggleFollow() async {
+        guard let userId = user.wrappedValue?.id else { return }
+        guard !isLoadingFollow else { return }
+        
+        isLoadingFollow = true
+        defer { isLoadingFollow = false }
+        
+        do {
+            if followInfo?.isFollowing == true {
+                try await UserService.shared.unfollowUser(userId: userId)
+            } else {
+                try await UserService.shared.followUser(userId: userId)
+            }
+            await loadFollowInfo()
+        } catch {
+            print("Failed to toggle follow: \(error)")
+        }
     }
 }
 
