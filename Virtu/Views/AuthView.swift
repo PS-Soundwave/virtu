@@ -52,7 +52,7 @@ struct AuthView: View {
                         } else {
                             try await Auth.auth().signIn(withEmail: email, password: password)
 
-                            if let _ = try? await UserService.shared.getCurrentUser() {
+                            if let _ = try await UserService.shared.getCurrentUser() {
                                 await MainActor.run {
                                     viewModel.hasUsername = true
                                     viewModel.isAuthenticated = true
