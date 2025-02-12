@@ -2,13 +2,11 @@ import SwiftUI
 import PhotosUI
 
 struct ContentView: View {
-    @State private var showingGallery = false
     @State private var showingPhotoPicker = false
     @State private var selectedItems = [PhotosPickerItem]()
     @State private var isUploading = false
     @State private var uploadError: Error?
     @State private var showingSearchSheet = false
-    @State private var galleryUser: User? = nil
     @State private var videos = [Video]()
     @State private var baseURL: String
 
@@ -25,7 +23,7 @@ struct ContentView: View {
     var body: some View {
         VStack {
             GeometryReader { geometry in 
-                ScrollView(.vertical) {
+                ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 0) {
                         ForEach(videos) { video in
                             VideoPlayerView(video: video)
@@ -37,14 +35,6 @@ struct ContentView: View {
             }
             
             HStack(alignment: .center, spacing: 30) {
-                Button(action: {
-                    galleryUser = nil
-                    showingGallery = true
-                }) {
-                    Image(systemName: "photo.stack")
-                        .font(.system(size: 30))
-                }
-                
                 Menu {
                     Button(action: {
                         print("Record from OBS tapped")
@@ -95,14 +85,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingSearchSheet) {
             SearchSheet(onUserSelected: { user in 
-                galleryUser = user
                 showingSearchSheet = false
-                showingGallery = true
             })
             .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $showingGallery) {
-            GalleryView(user: $galleryUser)
         }
         .ignoresSafeArea(edges: [.top, .leading, .trailing])
         .ignoresSafeArea(.keyboard)
