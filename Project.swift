@@ -20,7 +20,7 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 "UILaunchScreen": ["UIColorName": "Background"],
                 "FirebaseAppDelegateProxyEnabled": false,
-                "APIBaseURL": "http://169.254.98.155:3000",
+                "APIBaseURL": "http://169.254.51.229:3000",
                 "S3BaseURL": "https://d2atizltqcfmsa.cloudfront.net",
                 "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"]
             ]),

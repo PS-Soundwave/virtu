@@ -4,15 +4,18 @@ import AVKit
 // Custom video player view that handles HLS streams
 struct VideoPlayerView: View {
     let video: Video
+    var isFullScreen: Bool = false
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
     @State private var isVisible = false
     @State private var player: AVPlayer?
     @State private var isPlaying = false
     
     var body: some View {
         ZStack {
-            // Video player
+            Color.black.edgesIgnoringSafeArea(.all)
+            
             if let player = player {
                 AVPlayerControllerRepresentable(player: player)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -36,7 +39,7 @@ struct VideoPlayerView: View {
                     }
             }
 
-            if !isPlaying {
+            if false {
                 AsyncImage(url: video.thumbnailURL) { image in
                     image
                         .resizable()
@@ -46,35 +49,32 @@ struct VideoPlayerView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .overlay(alignment: .topLeading) {
+            if isFullScreen {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(8)
+                        .background(.black.opacity(0.3), in: Circle())
+                }
+                .padding()
+            }
+        }
         .onAppear {
             if player == nil {
                 let player = AVPlayer(url: video.streamURL)
                 self.player = player
                 
-                player.playImmediately(atRate: 1)
-                
-                Task {
-                    await withTaskGroup(of: Void.self) { group in
-                        // Monitor playback status
-                        group.addTask {
-                            for await status in player.publisher(for: \.timeControlStatus).values {
-                                await MainActor.run {
-                                    isPlaying = isPlaying || status == .playing && player.currentItem?.isPlaybackLikelyToKeepUp == true
-                                }
-                            }
-                        }
-                        
-                        // Monitor buffer state
-                        group.addTask {
-                            guard let item = player.currentItem else { return }
-                            for await keepUp in item.publisher(for: \.isPlaybackLikelyToKeepUp).values {
-                                await MainActor.run {
-                                    isPlaying = isPlaying || keepUp && player.timeControlStatus == .playing
-                                }
-                            }
-                        }
-                    }
+                if isFullScreen {
+                    player.play()
                 }
+            }
+        }
+        .onDisappear {
+            player?.pause()
+            if isFullScreen {
+                player = nil
             }
         }
     }

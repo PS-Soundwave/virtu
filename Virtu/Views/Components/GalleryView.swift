@@ -6,6 +6,7 @@ struct GalleryView: View {
     @State private var videos: [Video] = []
     @State private var isLoading = false
     @State private var error: Error?
+    @State private var selectedVideo: Video?
 
     var body: some View {
         ScrollView {
@@ -45,7 +46,15 @@ struct GalleryView: View {
                         ], spacing: 2
                     ) {
                         ForEach(videos) { video in
-                            VideoThumbnail(video: video)
+                            GeometryReader { geometry in
+                                VideoThumbnail(video: video)
+                                    .frame(width: geometry.size.width, height: geometry.size.width)
+                                    .clipped()
+                            }
+                            .aspectRatio(1, contentMode: .fit)
+                            .onTapGesture {
+                                selectedVideo = video
+                            }
                         }
                     }
                 }
@@ -55,10 +64,8 @@ struct GalleryView: View {
         .task {
             await loadVideos()
         }
-        .onChange(of: user.wrappedValue?.id) { _, _ in
-            Task {
-                await loadVideos()
-            }
+        .fullScreenCover(item: $selectedVideo) { video in
+            VideoPlayerView(video: video, isFullScreen: true)
         }
     }
     
@@ -82,20 +89,28 @@ struct VideoThumbnail: View {
     let video: Video
 
     var body: some View {
-        GeometryReader { geometry in
-            AsyncImage(url: video.streamURL) { image in
+        AsyncImage(url: video.thumbnailURL) { phase in
+            switch phase {
+            case .empty:
+                Color.gray
+                    .overlay {
+                        ProgressView()
+                    }
+            case .success(let image):
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: geometry.size.width, height: geometry.size.width)
                     .clipped()
-            } placeholder: {
-                ProgressView()
-                    .frame(width: geometry.size.width, height: geometry.size.width)
-                    .background(.gray.opacity(0.3))
+            case .failure:
+                Color.gray
+                    .overlay {
+                        Image(systemName: "video.slash.fill")
+                            .foregroundStyle(.white)
+                    }
+            @unknown default:
+                Color.gray
             }
         }
-        .aspectRatio(1, contentMode: .fit)
     }
 }
 
