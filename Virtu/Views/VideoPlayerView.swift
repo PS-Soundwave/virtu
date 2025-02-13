@@ -14,12 +14,10 @@ struct VideoPlayerView: View {
     
     var body: some View {
         ZStack {
-            Color.black.edgesIgnoringSafeArea(.all)
-            
             if let player = player {
                 AVPlayerControllerRepresentable(player: player)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onScrollVisibilityChange(threshold: 1) { visible in
+                    .onScrollVisibilityChange(threshold: 0.99) { visible in
                         isVisible = visible
 
                         if visible {
@@ -37,16 +35,6 @@ struct VideoPlayerView: View {
                             player.pause()
                         }
                     }
-            }
-
-            if false {
-                AsyncImage(url: video.thumbnailURL) { image in
-                    image
-                        .resizable()
-                } placeholder: {
-                    Color.gray
-                }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .overlay(alignment: .topLeading) {

@@ -9,7 +9,8 @@ struct GalleryView: View {
     @State private var selectedVideo: Video?
     @State private var followInfo: FollowInfo?
     @State private var isLoadingFollow = false
-    
+    @State private var currentUser: User?
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -28,22 +29,26 @@ struct GalleryView: View {
                                 .bold()
                                 .lineLimit(1)
                             
-                            Button(action: {
-                                Task {
-                                    await toggleFollow()
+                            if let galleryUserId = user.wrappedValue?.id,
+                               let currentUserId = currentUser?.id,
+                               galleryUserId != currentUserId {
+                                Button(action: {
+                                    Task {
+                                        await toggleFollow()
+                                    }
+                                }) {
+                                    Text(followInfo?.isFollowing ?? false ? "Unfollow" : "Follow")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+                                        .frame(width: 120)
+                                        .padding(.vertical, 8)
+                                        .background(followInfo?.isFollowing ?? false ? Color.gray : Color.blue)
+                                        .cornerRadius(20)
                                 }
-                            }) {
-                                Text(followInfo?.isFollowing ?? false ? "Unfollow" : "Follow")
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                                    .frame(width: 120)
-                                    .padding(.vertical, 8)
-                                    .background(followInfo?.isFollowing ?? false ? Color.gray : Color.blue)
-                                    .cornerRadius(20)
+                                .disabled(isLoadingFollow)
+                                .opacity(isLoadingFollow ? 0.5 : 1)
                             }
-                            .disabled(isLoadingFollow)
-                            .opacity(isLoadingFollow ? 0.5 : 1)
                         }
                         
                         Spacer()
@@ -134,13 +139,17 @@ struct GalleryView: View {
         guard let userId = user.wrappedValue?.id else { return }
         
         do {
+            // First get the current user
+            currentUser = try await UserService.shared.getCurrentUser()
+            
+            // Then get follow info
             let newFollowInfo = try await UserService.shared.getFollowInfo(userId: userId)
             
             await MainActor.run {
                 followInfo = newFollowInfo
             }
         } catch {
-            print("Failed to load follow info: \(error)")
+            print("Error loading follow info: \(error)")
         }
     }
     

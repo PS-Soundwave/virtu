@@ -79,6 +79,7 @@ struct ContentView: View {
                     await uploadVideo(url: videoData.url)
                 }
             }
+            selectedItems = []
         }
         .overlay {
             if isUploading {
