@@ -5,6 +5,7 @@ struct VideoManagerView: View {
     @State private var videos: [Video] = []
     @State private var isLoading = false
     @State private var error: Error?
+    @State private var selectedVideo: Video?
     
     var body: some View {
         NavigationView {
@@ -23,6 +24,8 @@ struct VideoManagerView: View {
                                 Task {
                                     await updateVideoVisibility(video: video, visibility: visibility)
                                 }
+                            }, onTap: {
+                                selectedVideo = video
                             })
                         }
                     }
@@ -40,6 +43,9 @@ struct VideoManagerView: View {
             }
             .task {
                 await loadVideos()
+            }
+            .fullScreenCover(item: $selectedVideo) { video in
+                VideoPlayerView(video: video, isFullScreen: true)
             }
         }
     }
@@ -77,18 +83,26 @@ struct VideoManagerView: View {
 struct VideoManagerThumbnail: View {
     let video: Video
     let onVisibilityToggle: (String) -> Void
+    let onTap: () -> Void
     
     var body: some View {
         VStack {
-            AsyncImage(url: URL(string: "\(PropertiesService.shared.s3BaseURL)/\(video.thumbnail_key)")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color.gray
+            Button(action: onTap) {
+                AsyncImage(url: URL(string: "\(PropertiesService.shared.s3BaseURL)/\(video.thumbnail_key)")) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray
+                }
+                .frame(height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(alignment: .center) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
             }
-            .frame(height: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
             
             Button(action: {
                 onVisibilityToggle(video.visibility == "public" ? "private" : "public")
