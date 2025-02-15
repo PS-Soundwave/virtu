@@ -30,7 +30,7 @@ struct VirtuApp: App {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.red)
+            .background(.black)
         }
     }
 }

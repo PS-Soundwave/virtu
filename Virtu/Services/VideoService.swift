@@ -59,4 +59,48 @@ struct VideoService {
 
         try HttpError.guardStatusCode(code: httpResponse.statusCode)
     }
+    
+    func getUserVideos() async throws -> [Video] {
+        guard let token = try await Auth.auth().currentUser?.getIDToken() else {
+            throw HttpError.unauthorized
+        }
+        
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/user/me/video")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+        
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+        
+        return try JSONDecoder().decode([Video].self, from: data)
+    }
+    
+    func updateVideoVisibility(videoId: String, visibility: String) async throws {
+        guard let token = try await Auth.auth().currentUser?.getIDToken() else {
+            throw HttpError.unauthorized
+        }
+        
+        let url = URL(string: "\(PropertiesService.shared.baseURL)/video/\(videoId)/visibility")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["visibility": visibility]
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HttpError.serverError
+        }
+        
+        try HttpError.guardStatusCode(code: httpResponse.statusCode)
+    }
 }

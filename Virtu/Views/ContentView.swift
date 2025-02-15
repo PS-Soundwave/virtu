@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var baseURL: String
     @State private var selectedUser: User?
     @State private var showingGallery = false
+    @State private var showingVideoManager = false
 
     init() {
         guard
@@ -53,7 +54,14 @@ struct ContentView: View {
                     Image(systemName: "video.badge.plus")
                         .font(.system(size: 30))
                 }
-
+                
+                Button(action: {
+                    showingVideoManager = true
+                }) {
+                    Image(systemName: "film")
+                        .font(.system(size: 30))
+                }
+                
                 Button(action: {
                     showingSearchSheet = true
                 }) {
@@ -95,7 +103,12 @@ struct ContentView: View {
             .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingGallery) {
-            GalleryView(user: $selectedUser)
+            if let user = selectedUser {
+                GalleryView(user: .constant(user))
+            }
+        }
+        .sheet(isPresented: $showingVideoManager) {
+            VideoManagerView()
         }
         .ignoresSafeArea(edges: [.top, .leading, .trailing])
         .ignoresSafeArea(.keyboard)
